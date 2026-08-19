@@ -1,0 +1,39 @@
+{
+  "name": "chrysalis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Declarative Discord Server Provisioner/Reconciler (REST-only, one-shot CLI)",
+  "type": "module",
+  "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "sync": "node --env-file-if-exists=.env --import=tsx src/cli/sync.ts",
+    "create": "node --env-file-if-exists=.env --import=tsx src/cli/create.ts",
+    "validate": "node --env-file-if-exists=.env --import=tsx src/cli/validate.ts",
+    "adopt": "node --env-file-if-exists=.env --import=tsx src/cli/adopt.ts",
+    "recover-pending": "node --env-file-if-exists=.env --import=tsx src/cli/recover-pending.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "check": "biome check --write .",
+    "test": "vitest run --project unit --project integration",
+    "test:watch": "vitest",
+    "test:sandbox": "vitest run --project sandbox"
+  },
+  "dependencies": {
+    "@discordjs/rest": "^2.6.3",
+    "discord-api-types": "^0.38.49",
+    "discord.js": "^14.27.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.8",
+    "@sinonjs/fake-timers": "^13.0.5",
+    "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "tsx": "^4.23.12",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

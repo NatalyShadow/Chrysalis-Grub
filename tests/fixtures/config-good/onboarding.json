@@ -1,0 +1,15 @@
+{
+  "onboarding": {
+    "enabled": true,
+    "mode": "ONBOARDING_ADVANCED",
+    "defaultChannels": [
+      "general",
+      "gaming",
+      "announcements",
+      "events",
+      "streams",
+      "support",
+      "community"
+    ]
+  }
+}

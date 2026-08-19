@@ -1,0 +1,24 @@
+# Environment (never baked into the image — security.md §6)
+.env
+.env.*
+!.env.example
+
+# Tooling / build artifacts
+node_modules
+dist
+coverage
+.git
+
+# Tests & docs (not needed at runtime)
+tests
+docs
+llm_files
+*.log
+
+# Chrysalis state: journal/state are gitignored anyway; only the committed
+# manifest.json is baked (ADR-001 §2). Keep it — do NOT ignore .chrysalis/
+# wholesale or the bindings would be missing in the image.
+.chrysalis/journal.jsonl
+.chrysalis/journal.clone.jsonl
+.chrysalis/state.json
+.chrysalis/*.lock

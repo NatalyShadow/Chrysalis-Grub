@@ -1,0 +1,24 @@
+{
+  "onboarding": {
+    "prompts": [
+      {
+        "key": "path",
+        "title": "Choose your path",
+        "type": "MULTIPLE_CHOICE",
+        "singleSelect": true,
+        "required": true,
+        "inOnboarding": true,
+        "options": [
+          {
+            "key": "chat",
+            "title": "Chat",
+            "emoji": "💬",
+            "roles": ["chat"],
+            "channels": ["gaming"],
+            "roleId": "1507545623992209100"
+          }
+        ]
+      }
+    ]
+  }
+}

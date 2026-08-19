@@ -1,0 +1,23 @@
+services:
+  chrysalis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chrysalis:local
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./.chrysalis:/app/state
+      - ./config:/app/config
+    env_file:
+      - path: .env
+        required: false
+    security_opt:
+      - no-new-privileges:true
+    # One-shot CLI (security.md §9: no published ports). Default command is
+    # harmless; real use is `docker compose run --rm chrysalis <command>`:
+    #   docker compose run --rm chrysalis validate
+    #   docker compose run --rm chrysalis sync --guild $GUILD_ID --yes
+    command: ["help"]
