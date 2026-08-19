@@ -33,19 +33,19 @@ GUILD_ID=paste_your_source_server_id_here
 
 > 💡 `GUILD_ID` is the **source** guild (the one `sync` exports from — it
 > never changes). The **target** guild id is declared per run when you build a
-> clone: `pnpm run create --guild <target-id> --yes`.
+> clone: `make create TARGET_ID=<target-id> --yes`.
 
 ### 3. Install & validate
 
 ```bash
-pnpm install
-pnpm validate        # checks the config offline (no network)
+make build            # construir imagen Docker (una sola vez)
+make validate         # validar config offline (sin red)
 ```
 
 ### 4. Run it
 
 ```bash
-pnpm run create --guild <target-id> --yes   # builds/reconciles the target server from config/clone
+make create TARGET_ID=<target-id> --yes   # builds/reconciles the target server from config/clone
 ```
 
 That's it — new members get greeted by the prompts you declared. 🦋✨
