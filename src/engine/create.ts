@@ -248,14 +248,26 @@ async function runReconcileUnlocked(
 
   let onboardingResult: EngineResult | undefined;
   if (semantic.onboarding.prompts.length > 0) {
-    onboardingResult = await runEngine(rawConfig, {
-      port: options.port,
-      manifest: executedManifest,
-      guildId: options.guildId,
-      dryRun: false,
-      ...(options.journal ? { journal: options.journal } : {}),
-      ...(options.reasonSuffix ? { reasonSuffix: options.reasonSuffix } : {}),
-    });
+    // Exact copy: defaultChannels are private (verify role). Make them
+    // temporarily visible to @everyone for the PUT, then revert to private
+    // so the clone stays identical to the source (no commit, config stays ignored).
+    const tempVisibility = await ensureDefaultChannelsVisibleForOnboarding(
+      semantic,
+      executedManifest,
+      options,
+    );
+    try {
+      onboardingResult = await runEngine(rawConfig, {
+        port: options.port,
+        manifest: executedManifest,
+        guildId: options.guildId,
+        dryRun: false,
+        ...(options.journal ? { journal: options.journal } : {}),
+        ...(options.reasonSuffix ? { reasonSuffix: options.reasonSuffix } : {}),
+      });
+    } finally {
+      await restoreDefaultChannelsVisibility(tempVisibility, options);
+    }
   }
 
   return {
@@ -292,6 +304,103 @@ async function dryRunOnboarding(
       };
     }
     throw error;
+  }
+}
+
+interface TempVisibilityPatch {
+  channelId: string;
+  originalOverwrites: ApiPermissionOverwrite[] | null | undefined;
+}
+
+async function ensureDefaultChannelsVisibleForOnboarding(
+  semantic: SemanticResult,
+  manifest: ManifestData,
+  options: CreateOptions,
+): Promise<TempVisibilityPatch[]> {
+  const defaultChannels = semantic.onboarding.defaultChannels ?? [];
+  if (defaultChannels.length === 0) return [];
+  const defaultIds = defaultChannels
+    .map((authored) => {
+      const key = authored.startsWith("ref:")
+        ? authored.slice("ref:".length)
+        : `channels.${authored}`;
+      return manifest.bindings[key]?.discordId;
+    })
+    .filter((id): id is string => Boolean(id));
+  if (defaultIds.length === 0) return [];
+  const [channels, roles] = await Promise.all([
+    options.port.listChannels(options.guildId),
+    options.port.listRoles(options.guildId),
+  ]);
+  const channelById = new Map(channels.map((ch) => [ch.id, ch]));
+  const everyone = roles.find((r) => r.id === options.guildId);
+  const base = everyone ? BigInt(everyone.permissions) : 0n;
+  const VIEW = 1024n;
+  const SEND = 2048n;
+  const patches: TempVisibilityPatch[] = [];
+  const reason = `Chrysalis: onboarding default visibility fix${options.reasonSuffix ? ` ${options.reasonSuffix}` : ""}`;
+  for (const id of defaultIds) {
+    const live = channelById.get(id);
+    if (!live) continue;
+    const overwrites = live.permission_overwrites ?? [];
+    const everyoneOverwrite = overwrites.find((o) => o.type === 0 && o.id === options.guildId);
+    const allow = everyoneOverwrite ? BigInt(everyoneOverwrite.allow) : 0n;
+    const deny = everyoneOverwrite ? BigInt(everyoneOverwrite.deny) : 0n;
+    const effective = (base | allow) & ~deny;
+    const canView = (effective & VIEW) !== 0n;
+    const canSend = (effective & SEND) !== 0n;
+    if (!canView || !canSend) {
+      const original = live.permission_overwrites ? [...live.permission_overwrites] : null;
+      // Make visible+sendable: ensure allow has VIEW+SEND and deny has neither
+      const newAllow = (allow | VIEW | SEND).toString();
+      const newDeny = (deny & ~(VIEW | SEND)).toString();
+      const newOverwrites: ApiPermissionOverwrite[] = overwrites.map((o) =>
+        o.type === 0 && o.id === options.guildId ? { ...o, allow: newAllow, deny: newDeny } : o,
+      );
+      if (!everyoneOverwrite) {
+        newOverwrites.push({ id: options.guildId, type: 0, allow: newAllow, deny: "0" });
+      }
+      await options.port.updateChannel(
+        options.guildId,
+        id,
+        { permission_overwrites: newOverwrites },
+        reason,
+      );
+      patches.push({ channelId: id, originalOverwrites: original });
+      await options.journal?.append({
+        op: "onboarding.defaultChannelVisibilityFix",
+        intent: "before",
+        status: "done",
+        detail: id,
+      });
+    }
+  }
+  return patches;
+}
+
+async function restoreDefaultChannelsVisibility(
+  patches: TempVisibilityPatch[],
+  options: CreateOptions,
+): Promise<void> {
+  if (patches.length === 0) return;
+  const reason = `Chrysalis: restore onboarding default visibility${options.reasonSuffix ? ` ${options.reasonSuffix}` : ""}`;
+  for (const patch of patches) {
+    try {
+      await options.port.updateChannel(
+        options.guildId,
+        patch.channelId,
+        { permission_overwrites: patch.originalOverwrites ?? [] },
+        reason,
+      );
+      await options.journal?.append({
+        op: "onboarding.defaultChannelVisibilityFix",
+        intent: "after",
+        status: "done",
+        detail: patch.channelId,
+      });
+    } catch {
+      // Best-effort revert; leave target with temporarily visible defaults if revert fails
+    }
   }
 }
 

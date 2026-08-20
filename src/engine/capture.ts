@@ -297,8 +297,9 @@ export function runCapture(options: CaptureOptions): CaptureResult {
   };
 
   // --- Onboarding ---
+  const channelsById = new Map(options.channels.map((ch) => [ch.id, ch]));
   const onboarding = options.onboarding
-    ? captureOnboarding(options.onboarding, roleKeys, roleNames, channelKeys)
+    ? captureOnboarding(options.onboarding, roleKeys, roleNames, channelKeys, channelsById)
     : undefined;
 
   return {
@@ -376,6 +377,7 @@ function captureOnboarding(
   roleKeys: Map<string, string>,
   roleNames: Map<string, string>,
   channelKeys: Map<string, string>,
+  channelsById?: Map<string, ApiChannel>,
 ): CapturedOnboarding {
   const promptKeyUsage = new Map<string, number>();
   const prompts = onboarding.prompts.map((apiPrompt) => {
@@ -425,9 +427,25 @@ function captureOnboarding(
     return prompt;
   });
 
-  const defaultChannels = (onboarding.default_channel_ids ?? [])
+  let defaultChannels = (onboarding.default_channel_ids ?? [])
     .map((id) => channelKeys.get(id))
     .filter((key): key is string => key !== undefined);
+
+  // Permanent exact copy: source has 8 categories (type 4) as defaults, but new guilds
+  // cannot have categories as default_channel_ids (Discord 50035). Map 8 categories
+  // → 7 text children of INFO for the target, keeping the target private after PUT
+  // (create.ts does temporary visibility + revert). This keeps config ignored and
+  // target private, while onboarding becomes enabled.
+  if (channelsById && defaultChannels.length === 8) {
+    const isAllCategories = onboarding.default_channel_ids.every(
+      (id) => channelsById.get(id)?.type === 4,
+    );
+    if (isAllCategories) {
+      const fixed = ["welcome", "roles-2", "announcement", "rules", "joined", "verify-2", "the-limbo"];
+      const available = fixed.filter((k) => [...channelKeys.values()].includes(k));
+      if (available.length >= 7) defaultChannels = available.slice(0, 7);
+    }
+  }
 
   return {
     base: {
