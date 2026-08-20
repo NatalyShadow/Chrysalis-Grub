@@ -299,7 +299,6 @@ describe("runEngine — apply (phases 1–10)", () => {
     expect(second.plan.op).toBe("NOOP");
   });
 });
-});
 
 describe("runEngine — prompts only (manageDefaultChannels: false)", () => {
   const promptsOnlyConfig = {

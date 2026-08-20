@@ -172,7 +172,20 @@ export function runCapture(options: CaptureOptions): CaptureResult {
     }
   }
 
-  for (const channel of options.channels) {
+  // Deterministic ordering: Discord does not guarantee API order, so sort
+  // by parent then position to make `channelOrder` (and thus `ordering`)
+  // stable across sync runs (plan: create deferred ordering §1a).
+  const sortedChannels = [...options.channels].sort((a, b) => {
+    const aParent = a.parent_id ?? "";
+    const bParent = b.parent_id ?? "";
+    if (aParent !== bParent) return aParent.localeCompare(bParent);
+    const aPos = a.position ?? 0;
+    const bPos = b.position ?? 0;
+    if (aPos !== bPos) return aPos - bPos;
+    return a.id.localeCompare(b.id);
+  });
+
+  for (const channel of sortedChannels) {
     if (excludedIds.has(channel.id)) {
       const insideCategory =
         channel.parent_id !== null &&
@@ -191,7 +204,8 @@ export function runCapture(options: CaptureOptions): CaptureResult {
     channelKeys.set(channel.id, key);
     sourceBindings[`channels.${key}`] = channel.id;
 
-    // Parent ref: only when the parent was captured too.
+    // Parent ref: only when the parent was captured too (parents are
+    // categories with type 4, which sort first by parent="" → already captured).
     let parent: string | undefined;
     if (channel.parent_id) {
       const parentKey = channelKeys.get(channel.parent_id);
@@ -221,6 +235,10 @@ export function runCapture(options: CaptureOptions): CaptureResult {
             availableTags: channel.available_tags.map((tag) => ({
               name: tag.name,
               ...(tag.emoji_name ? { emojiName: tag.emoji_name } : {}),
+              ...(tag.emoji_id ? { emojiId: tag.emoji_id } : {}),
+              // Always capture moderated (true/false) to keep fingerprint
+              // stable across syncs (plan: moderated siempre).
+              moderated: tag.moderated ?? false,
             })),
           }
         : {}),
@@ -434,7 +452,11 @@ function findSeparatorRoleId(
   const candidates = first.role_ids.filter((id) =>
     options.every((option) => option.role_ids.includes(id)),
   );
-  return candidates[0];
+  if (candidates.length === 0) return undefined;
+  // Deterministic: when a prompt shares >1 role across all options (e.g.
+  // GENDER + VERIFIED), pick the lexicographically smallest snowflake
+  // (plan create §1c) instead of arbitrary candidates[0].
+  return [...candidates].sort((a, b) => a.localeCompare(b))[0];
 }
 
 /** Deterministic key from a name; collision-safe with a numeric suffix. */

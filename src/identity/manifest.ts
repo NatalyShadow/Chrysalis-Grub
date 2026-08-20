@@ -1,4 +1,4 @@
-import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import {
@@ -42,7 +42,12 @@ export class ManifestStore {
       }
       throw error;
     }
-    const data = JSON.parse(raw) as ManifestData;
+    let data: ManifestData;
+    try {
+      data = JSON.parse(raw) as ManifestData;
+    } catch (error) {
+      throw new ManifestInvalidError([`invalid JSON: ${(error as Error).message}`]);
+    }
     const validation = validateManifest(data);
     if (!validation.ok) {
       throw new ManifestInvalidError(validation.errors);
@@ -370,6 +375,14 @@ async function isStaleLock(path: string): Promise<boolean> {
     process.kill(pid, 0);
     return false;
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "ESRCH";
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return true;
+    // Fallback for Windows EPERM or other kill failures: treat lock as
+    // stale if its mtime is older than 5 minutes (plan: fallback 5m).
+  }
+  try {
+    const info = await stat(path);
+    return Date.now() - info.mtimeMs > 5 * 60 * 1000;
+  } catch {
+    return false;
   }
 }

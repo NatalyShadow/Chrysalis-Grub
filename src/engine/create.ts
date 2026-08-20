@@ -70,7 +70,14 @@ export interface ChannelCreatePayload {
   userLimit?: number | undefined;
   videoQualityMode?: number | undefined;
   defaultAutoArchiveDuration?: number | undefined;
-  availableTags?: Array<{ name: string; emojiName?: string | undefined }> | undefined;
+  availableTags?:
+    | Array<{
+        name: string;
+        emojiName?: string | undefined;
+        emojiId?: string | null | undefined;
+        moderated?: boolean | undefined;
+      }>
+    | undefined;
   parentRef?: string | undefined;
   overwrites?:
     | Array<{ ref: string; allow?: string | undefined; deny?: string | undefined }>
@@ -715,7 +722,7 @@ function buildChannelOps(
     }
   }
 
-  const positionPlan = buildChannelPositionPlan(spec, live.channels, manifest);
+  const positionPlan = buildChannelPositionPlan(spec, live.channels, manifest, warnings);
   if (positionPlan.op) ops.push(positionPlan.op);
 
   const untracked = live.channels
@@ -739,6 +746,7 @@ function buildChannelPositionPlan(
   spec: ValidatedChannels | undefined,
   liveChannels: ApiChannel[],
   manifest: ManifestData,
+  warnings?: string[],
 ): ChannelPositionPlan {
   const groups = buildChannelGroups(spec);
   const liveById = new Map(liveChannels.map((channel) => [channel.id, channel]));
@@ -750,6 +758,7 @@ function buildChannelPositionPlan(
     const parentId = parentKey ? manifest.bindings[`channels.${parentKey}`]?.discordId : undefined;
     if (parentKey && !parentId) {
       deferred = true;
+      warnings?.push(`parent of group "${parentKey}" is unbound — channel ordering deferred`);
       continue;
     }
     const desiredSeq = desiredKeys
@@ -1294,6 +1303,8 @@ function resolveChannelCreate(
     body.available_tags = payload.availableTags.map((tag) => ({
       name: tag.name,
       ...(tag.emojiName ? { emoji_name: tag.emojiName } : {}),
+      ...(tag.emojiId ? { emoji_id: tag.emojiId } : {}),
+      moderated: tag.moderated ?? false,
     }));
   }
   if (payload.parentRef) {

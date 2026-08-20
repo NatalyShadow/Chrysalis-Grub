@@ -87,8 +87,11 @@ export function canonicalizeDesired(desired: ResolvedOnboarding): CanonicalOnboa
     prompts: desired.prompts.map((prompt) => ({
       title: prompt.title,
       type: PROMPT_TYPE_VALUE[prompt.type],
-      singleSelect: prompt.singleSelect ?? ABSENT,
-      required: prompt.required ?? ABSENT,
+      // Discord persists these as false when absent (API always returns
+      // booleans); an unset spec field must compare equal to current false
+      // to avoid perpetual UPDATE (see inOnboarding fix).
+      singleSelect: prompt.singleSelect ?? false,
+      required: prompt.required ?? false,
       // in_onboarding is a required boolean on Discord's side (the API always
       // returns it); an unset spec field means "not in the flow" → false, so
       // the canonical desired must compare equal to the current `false`.
@@ -119,8 +122,8 @@ export function canonicalizeCurrent(current: ApiOnboarding): CanonicalOnboarding
     prompts: current.prompts.map((prompt) => ({
       title: prompt.title,
       type: prompt.type,
-      singleSelect: prompt.single_select ?? ABSENT,
-      required: prompt.required ?? ABSENT,
+      singleSelect: prompt.single_select ?? false,
+      required: prompt.required ?? false,
       inOnboarding: prompt.in_onboarding ?? false,
       options: prompt.options.map((option) => {
         const hasEmoji = option.emoji != null && option.emoji.name != null;

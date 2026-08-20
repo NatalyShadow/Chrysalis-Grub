@@ -293,6 +293,14 @@ export const channelSchema = z.object({
       z.object({
         name: z.string().min(1).max(100),
         emojiName: z.string().max(32).optional(),
+        // Forum tag moderated flag — captured always (true/false) to keep
+        // fingerprint stable; emojiId preserves custom emoji snowflake.
+        moderated: z.boolean().optional(),
+        emojiId: z
+          .string()
+          .regex(/^\d+$/, { message: "must be a snowflake" })
+          .optional()
+          .nullable(),
       }),
     )
     .max(20)

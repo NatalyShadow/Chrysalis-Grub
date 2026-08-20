@@ -99,7 +99,11 @@ describe("canonicalizeDesired", () => {
         },
       ],
     });
-    expect(sparse.prompts[0]?.required).toBe(ABSENT);
+    // Discord persists these as false when absent; canonical treats absent as
+    // false to avoid perpetual UPDATE (see post-join inOnboarding fix).
+    expect(sparse.prompts[0]?.singleSelect).toBe(false);
+    expect(sparse.prompts[0]?.required).toBe(false);
+    expect(sparse.prompts[0]?.inOnboarding).toBe(false);
     expect(sparse.prompts[0]?.options[0]?.description).toBe(ABSENT);
   });
 

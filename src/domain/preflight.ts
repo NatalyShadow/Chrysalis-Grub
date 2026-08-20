@@ -82,7 +82,7 @@ export function runPreflight(options: PreflightOptions): PreflightResult {
       },
     );
 
-if (options.enabled && options.manageDefaultChannels) {
+  if (options.enabled && options.manageDefaultChannels) {
     if (defaultChannels < 7) {
       errors.push(
         `onboarding enabled requires at least 7 default channels (found ${defaultChannels})`,
@@ -113,8 +113,8 @@ if (options.enabled && options.manageDefaultChannels) {
     if (hiddenChannels.length > 0 && !botHasAdmin) {
       errors.push(
         `onboarding enabled requires every default channel to be visible to @everyone ` +
-        `(VIEW_CHANNEL); Discord rejects hidden defaults: ` +
-        hiddenChannels.map((channel) => `"${channel.name}" (${channel.id})`).join(", "),
+          `(VIEW_CHANNEL); Discord rejects hidden defaults: ` +
+          hiddenChannels.map((channel) => `"${channel.name}" (${channel.id})`).join(", "),
       );
     }
   }

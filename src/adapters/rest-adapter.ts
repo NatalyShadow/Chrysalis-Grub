@@ -42,20 +42,47 @@ export class RestDiscord implements DiscordPort {
     this.rest.setToken(token);
   }
 
+  private async wrap<T>(action: () => Promise<T>): Promise<T> {
+    try {
+      return await action();
+    } catch (error) {
+      // Preserve Discord status/code for upstream CreateError wrapping
+      // (plan: rest error mapping). @discordjs/rest throws DiscordAPIError
+      // with .status/.code; enrich message so create.ts logs include it.
+      if (error !== null && typeof error === "object" && "status" in error) {
+        const status = (error as Record<string, unknown>).status;
+        const code = (error as Record<string, unknown>).code;
+        const message = error instanceof Error ? error.message : String(error);
+        const enriched = new Error(
+          `${message}${status !== undefined ? ` (status ${String(status)})` : ""}${code !== undefined ? ` code ${String(code)}` : ""}`,
+        );
+        (enriched as unknown as Record<string, unknown>).cause = error;
+        (enriched as unknown as Record<string, unknown>).status = status;
+        (enriched as unknown as Record<string, unknown>).code = code;
+        throw enriched;
+      }
+      throw error;
+    }
+  }
+
   async getGuild(guildId: string): Promise<ApiGuild> {
-    return (await this.rest.get(Routes.guild(guildId))) as ApiGuild;
+    return this.wrap(async () => (await this.rest.get(Routes.guild(guildId))) as ApiGuild);
   }
 
   async listChannels(guildId: string): Promise<ApiChannel[]> {
-    return (await this.rest.get(Routes.guildChannels(guildId))) as ApiChannel[];
+    return this.wrap(
+      async () => (await this.rest.get(Routes.guildChannels(guildId))) as ApiChannel[],
+    );
   }
 
   async listRoles(guildId: string): Promise<ApiRole[]> {
-    return (await this.rest.get(Routes.guildRoles(guildId))) as ApiRole[];
+    return this.wrap(async () => (await this.rest.get(Routes.guildRoles(guildId))) as ApiRole[]);
   }
 
   async getOnboarding(guildId: string): Promise<ApiOnboarding> {
-    return (await this.rest.get(Routes.guildOnboarding(guildId))) as ApiOnboarding;
+    return this.wrap(
+      async () => (await this.rest.get(Routes.guildOnboarding(guildId))) as ApiOnboarding,
+    );
   }
 
   async updateOnboarding(
@@ -63,18 +90,25 @@ export class RestDiscord implements DiscordPort {
     body: OnboardingPutBody,
     reason: string,
   ): Promise<ApiOnboarding> {
-    return (await this.rest.put(Routes.guildOnboarding(guildId), {
-      body,
-      reason,
-    })) as ApiOnboarding;
+    return this.wrap(
+      async () =>
+        (await this.rest.put(Routes.guildOnboarding(guildId), {
+          body,
+          reason,
+        })) as ApiOnboarding,
+    );
   }
 
   async updateGuild(guildId: string, body: GuildPatchBody, reason: string): Promise<ApiGuild> {
-    return (await this.rest.patch(Routes.guild(guildId), { body, reason })) as ApiGuild;
+    return this.wrap(
+      async () => (await this.rest.patch(Routes.guild(guildId), { body, reason })) as ApiGuild,
+    );
   }
 
   async createRole(guildId: string, body: RoleCreateBody, reason: string): Promise<ApiRole> {
-    return (await this.rest.post(Routes.guildRoles(guildId), { body, reason })) as ApiRole;
+    return this.wrap(
+      async () => (await this.rest.post(Routes.guildRoles(guildId), { body, reason })) as ApiRole,
+    );
   }
 
   async updateRole(
@@ -83,10 +117,13 @@ export class RestDiscord implements DiscordPort {
     body: RolePatchBody,
     reason: string,
   ): Promise<ApiRole> {
-    return (await this.rest.patch(Routes.guildRole(guildId, roleId), {
-      body,
-      reason,
-    })) as ApiRole;
+    return this.wrap(
+      async () =>
+        (await this.rest.patch(Routes.guildRole(guildId, roleId), {
+          body,
+          reason,
+        })) as ApiRole,
+    );
   }
 
   async updateRolePositions(
@@ -94,10 +131,13 @@ export class RestDiscord implements DiscordPort {
     entries: RolePositionEntry[],
     reason: string,
   ): Promise<ApiRole[]> {
-    return (await this.rest.patch(Routes.guildRoles(guildId), {
-      body: entries,
-      reason,
-    })) as ApiRole[];
+    return this.wrap(
+      async () =>
+        (await this.rest.patch(Routes.guildRoles(guildId), {
+          body: entries,
+          reason,
+        })) as ApiRole[],
+    );
   }
 
   async createChannel(
@@ -105,7 +145,10 @@ export class RestDiscord implements DiscordPort {
     body: ChannelCreateBody,
     reason: string,
   ): Promise<ApiChannel> {
-    return (await this.rest.post(Routes.guildChannels(guildId), { body, reason })) as ApiChannel;
+    return this.wrap(
+      async () =>
+        (await this.rest.post(Routes.guildChannels(guildId), { body, reason })) as ApiChannel,
+    );
   }
 
   async updateChannel(
@@ -114,7 +157,10 @@ export class RestDiscord implements DiscordPort {
     body: ChannelPatchBody,
     reason: string,
   ): Promise<ApiChannel> {
-    return (await this.rest.patch(Routes.channel(channelId), { body, reason })) as ApiChannel;
+    return this.wrap(
+      async () =>
+        (await this.rest.patch(Routes.channel(channelId), { body, reason })) as ApiChannel,
+    );
   }
 
   async updateChannelPositions(
@@ -122,9 +168,12 @@ export class RestDiscord implements DiscordPort {
     entries: ChannelPositionEntry[],
     reason: string,
   ): Promise<ApiChannel[]> {
-    return (await this.rest.patch(Routes.guildChannels(guildId), {
-      body: entries,
-      reason,
-    })) as ApiChannel[];
+    return this.wrap(
+      async () =>
+        (await this.rest.patch(Routes.guildChannels(guildId), {
+          body: entries,
+          reason,
+        })) as ApiChannel[],
+    );
   }
 }

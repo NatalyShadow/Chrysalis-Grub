@@ -82,12 +82,11 @@ export function buildPayload(
     return {
       id: matchedId ?? generateSnowflake(),
       title: prompt.title,
-      single_select: prompt.singleSelect,
-      required: prompt.required,
-      // Never omit: Discord defaults a missing in_onboarding to true, which
-      // would flood the onboarding flow with post-join prompts and trip the
-      // 5-in-flow limit (TOO_MANY_ONBOARDING_PROMPTS). An unset field in the
-      // spec means "not in the flow" (post-join) → false.
+      // Never omit booleans: Discord defaults missing fields and the canonical
+      // comparison treats absent as false. Omitting would cause perpetual
+      // UPDATE and, for in_onboarding, flood the flow (TOO_MANY_ONBOARDING_PROMPTS).
+      single_select: prompt.singleSelect ?? false,
+      required: prompt.required ?? false,
       in_onboarding: prompt.inOnboarding ?? false,
       type: prompt.type === "MULTIPLE_CHOICE" ? 0 : 1,
       options: prompt.options.map((option) => {
