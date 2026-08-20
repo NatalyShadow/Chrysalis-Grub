@@ -1,34 +1,36 @@
 # AGENTS.md — Chrysalis
 
-Guía para sesiones de agentes/IA y desarrolladores nuevos en este repositorio.
+Guide for agent/LLM sessions and new developers in this repository.
 
-## Qué es esto
+## What is this
 
-Chrysalis es un **provisioner/reconciliador declarativo de servidores de Discord**
-(CLI one-shot, REST puro vía `@discordjs/rest`, sin Gateway ni `Client`). Describes el
-estado deseado en una carpeta de fragmentos JSON y Chrysalis construye/reconcilia un
-servidor real hacia ese estado.
+Chrysalis is a **declarative Discord server provisioner/reconciler**
+(one-shot CLI, pure REST via `@discordjs/rest`, no Gateway or `Client`). You describe the
+desired state in a folder of JSON fragments and Chrysalis builds/reconciles a
+real server toward that state.
 
-**Dos verbos:**
+**Two verbs:**
 
-1. **`sync` (export del origen):** lee el server origen (read-only) y genera la spec
-   ID-free en `config/clone/` (guild/roles/channels **+ onboarding**: `onboarding.json`
-   y un `prompt-<key>.json` por prompt).
-2. **`create` (construcción del target):** construye el server target desde
-   `config/clone/` (create-and-bind, nunca borra). La gestión del onboarding del origen
-   quedó **fuera del CLI**: el origen se exporta con `sync` y se clona con `create`.
+1. **`sync` (source export):** reads the source server (read-only) and generates the
+   ID-free spec in `config/clone/` (guild/roles/channels **+ onboarding**: `onboarding.json`
+   and one `prompt-<key>.json` per prompt).
+2. **`create` (target build):** builds the target server from
+   `config/clone/` (create-and-bind, never deletes). Source onboarding management
+   is **out of the CLI**: the source is exported with `sync` and cloned with `create`.
 
-## Comandos
+## Commands
 
-| Comando | Qué hace |
+| Command | What it does |
 | --- | --- |
-| `pnpm validate` | Valida el config **offline** (Zod + semantic pass + pre-flight) |
-| `pnpm adopt <kind>.<key> <name>` · `--id <snowflake>` | Binda una key lógica a un snowflake en el manifest |
-| `pnpm sync` | Dump read-only del origen (`GUILD_ID` del `.env`) → `config/clone/` (`guild.json`/`roles.json`/`channels.json` + `onboarding.json` + `prompt-*.json`) + mergea los bindings capturados en `manifest.json` |
-| `pnpm run create --guild <id> [--config config/clone] [--dry-run] [--yes]` | Construye/reconcilia el **target** contra `manifest.clone.json` (crea + binda + parcha drift; nunca borra; dry-run por defecto; exit 0 converged / 2 applied). El id del target se declara por comando (`--guild <id>`; `GUILD_ID` del `.env` es el origen). Nota: `create` colisiona con el comando nativo `pnpm create` (starter kits), por eso se invoca `pnpm run create` (vía Docker es `chrysalis create`) |
-| `pnpm recover-pending <kind>.<key> --id <snowflake> --guild <id>` | Resuelve manualmente un create ambiguo del target y completa el binding (el id del target se pasa explícito) |
+| `pnpm validate` | Validates config **offline** (Zod + semantic pass + pre-flight) |
+| `pnpm adopt <kind>.<key> <name>` · `--id <snowflake>` | Binds a logical key to a snowflake in the manifest |
+| `pnpm sync` | Read-only dump of the source (`GUILD_ID` from `.env`) → `config/clone/` (`guild.json`/`roles.json`/`channels.json` + `onboarding.json` + `prompt-*.json`) + merges captured bindings into `manifest.json` |
+| `pnpm run create --guild <id> [--config config/clone] [--dry-run] [--yes]` | Builds/reconciles the **target** against `manifest.clone.json` (creates + binds + patches drift; never deletes; dry-run by default; exit 0 converged / 2 applied). Target ID is passed per command (`--guild <id>`; `GUILD_ID` in `.env` is the source). Note: `create` collides with native `pnpm create` (starter kits), so it is invoked as `pnpm run create` (via Docker it is `chrysalis create`) |
+| `pnpm recover-pending <kind>.<key> --id <snowflake> --guild <id>` | Manually resolves an ambiguous target create and completes the binding (target ID is passed explicitly) |
 
-## Verificación (gate)
+> Ideal via `make` (Docker): `make sync`, `make validate`, `make create-yes TARGET_ID=<id>`; `pnpm` remains as local alternative without Docker.
+
+## Verification (gate)
 
 ```bash
 pnpm typecheck   # tsc --noEmit (TS 7 strict)
@@ -36,65 +38,72 @@ pnpm check       # Biome (--write)
 pnpm test        # vitest --project unit --project integration
 pnpm build       # tsc -p tsconfig.build.json
 ```
+Or via `make` (ideal, runs in Docker):
+```bash
+make validate
+```
 
 ## Layout
 
-- `config/clone/` — **único directorio de config**: `guild.json` / `roles.json` /
-  `channels.json` (spec del clon) + `onboarding.json` (base) + un `prompt-<key>.json`
-  por prompt. **Todo lo regenera `sync`** (la captura del onboarding es ID-free:
-  `separatorRole`/`roles`/`channels` como refs lógicos contra el manifest).
-- `.chrysalis/manifest.json` — bindings key lógica ⇄ snowflake del **server origen**
-  (lo alimenta `sync`); `.chrysalis/manifest.clone.json` — manifest del **target**
-  (create-and-bind, pending creates y lock); `.chrysalis/clone-source.json` —
-  trazabilidad de la última exportación.
-- `src/` — `cli/` (comandos), `config/` (fragmentos, schema Zod, semantic pass),
-  `engine/` (runEngine del onboarding + `runCapture` + `runReconcile`), `identity/`
-  (manifest, adopt, journal), `adapters/` (REST + fake en memoria), `port/` (tipos de la API).
-- `tests/` — `unit/` + `integration/` (+ `sandbox/` opt-in, vacío, para E2E con server desechable).
-- `docs/` — diseño: `architecture.md`, `configuration.md`, `clone-server.md` (flujo clon),
+- `config/clone/` — **single config directory**: `guild.json` / `roles.json` /
+  `channels.json` (clone spec) + `onboarding.json` (base) + one `prompt-<key>.json`
+  per prompt. **Everything is regenerated by `sync`** (onboarding capture is ID-free:
+  `separatorRole`/`roles`/`channels` as logical refs against the manifest).
+- `.chrysalis/manifest.json` — bindings logical key ⇄ snowflake of the **source server**
+  (populated by `sync`); `.chrysalis/manifest.clone.json` — **target** manifest
+  (create-and-bind, pending creates and lock); `.chrysalis/clone-source.json` —
+  traceability of the last export.
+- `src/` — `cli/` (commands), `config/` (fragments, Zod schema, semantic pass),
+  `engine/` (onboarding `runEngine` + `runCapture` + `runReconcile`), `identity/`
+  (manifest, adopt, journal), `adapters/` (REST + in-memory fake), `port/` (API types).
+- `tests/` — `unit/` + `integration/` (+ `sandbox/` opt-in, empty, for E2E with disposable server).
+- `docs/` — design: `architecture.md`, `configuration.md`, `clone-server.md` (clone flow),
   `reconciliation.md` (engine + exit codes), `roadmap.md`, `decisions/` (ADR-001..004).
-- `llm_files/plan.md` — registro de progreso; el bloque **"Estado actual"** al tope es el snapshot
-  para retomar el trabajo.
-- `llm_files/agents/*.md` — **specs históricas** de la fase de arquitectura (2026-08-11);
-  NO reflejan el estado implementado (ver AGENTS.md + `docs/`).
+- `llm_files/plan.md` — progress tracker; the **"Current status"** block at the top is the snapshot
+  to resume work.
+- `llm_files/agents/*.md` — **historical** specs from the architecture phase (2026-08-11);
+  NOT reflecting implemented state (see AGENTS.md + `docs/`).
 
-## Modelo de config
+## Config model
 
-- Fragmentos **JSON puros** (un archivo por prompt/kind), merge en load time
-  (`mergeFragments`), validación Zod + semantic pass **antes de cualquier llamada a Discord**.
-- Identidad: la **key lógica** vive en config; el **snowflake** lo asigna Discord; el
-  **manifest es el único vínculo**. Refs: `ref:roles.<key>` o bare key (kind-scoped);
-  ref especial `"@everyone"` para overwrites (se resuelve al guild id del target en create).
-- Reglas clave: keys `[a-zA-Z0-9_-]`; ref sin binding → error con hint de `adopt`;
-  `sync` salta `@everyone`/roles managed y aplica exclusión de subárbol por categoría;
-  los refs de overwrites de canales los binda `create-and-bind` en el target. La key de
-  cada prompt de onboarding sale del slug del nombre del rol separador (el rol compartido
-  por todas sus opciones; `GENDER` → `gender`); las opciones toman la key de su rol
-  específico (p. ej. `hombre`).
+- **Pure JSON** fragments (one file per prompt/kind), merged at load time
+  (`mergeFragments`), Zod validation + semantic pass **before any Discord call**.
+- Identity: **logical key** lives in config; **snowflake** is assigned by Discord; **manifest is the only link**. Refs: `ref:roles.<key>` or bare key (kind-scoped);
+  special ref `"@everyone"` for overwrites (resolved to the target guild id in `create`).
+- Key rules: keys `[a-zA-Z0-9_-]`; ref without binding → error with `adopt` hint;
+  `sync` skips `@everyone`/managed roles and applies category subtree exclusion;
+  channel overwrite refs are bound by `create-and-bind` on the target. Each onboarding prompt's key
+  comes from the slug of the separator role name (the shared role for all its
+  options; `GENDER` → `gender`); options take the key of their specific role
+  (e.g. `hombre`).
 
-## Convenciones de código
+## Code conventions
 
-- TS estricto, **sin `any`/`unknown`**, `exactOptionalPropertyTypes`, imports con extensión
-  `.js`, `erasableSyntaxOnly`.
-- El puerto (`port/`) usa tipos snake_case del lado de la API; los adapters traducen.
-- Sin nuevas dependencias salvo que el plan lo pida; no refactorizar fuera del alcance.
+- Strict TS, **no `any`/`unknown`**, `exactOptionalPropertyTypes`, imports with `.js` extension,
+  `erasableSyntaxOnly`.
+- The port (`port/`) uses snake_case on the API side; adapters translate.
+- No new dependencies unless the plan requires them; do not refactor outside scope.
 
-## Estado actual (2026-08-18) y siguientes pasos
+## Current status (2026-08-20) and next steps
 
-- Implementado: onboarding completo (aplicable desde `create` en el target), `sync` = export
-  del origen (probado contra el origen: **157 roles / 67 canales / 121 overwrites**, 0 errores
-  semánticos; mergea sus bindings en `manifest.json`), **`create`** = reconciler multi-kind
-  create-and-bind contra `manifest.clone.json` (dry-run por defecto; exit 0 converged / 2
-  applied). `sync` captura también el **onboarding** del origen: `onboarding.json` +
-  10 `prompt-*.json` (keys de prompts = slug del rol separador: `gender`, `country`…;
-  opciones = key de su rol específico; refs lógicos contra el manifest). El id del origen
-  vive en `.env` (`GUILD_ID`); el id del target se declara por comando (`--guild <id>`).
-  Eliminados: `adopt-all`, `--manifest`, la reconciliación del origen en el CLI. Config
-  consolidado en un solo directorio (`config/clone/`; `config/onboarding/` eliminado).
-  194 tests verdes.
-- **Siguiente paso:** probar `create` contra un **server desechable** (bot con
-  `ADMINISTRATOR`) y confirmar los 4 puntos `UNVERIFIED` de `docs/clone-server.md` §UNVERIFIED.
+- Implemented: full onboarding (applicable from `create` on the target), `sync` = source
+  export (tested against source: **157 roles / 67 channels / 121 overwrites**, 0 semantic
+  errors; merges its bindings into `manifest.json`), **`create`** = multi-kind
+  create-and-bind reconciler against `manifest.clone.json` (dry-run by default; exit 0 converged / 2
+  applied). `sync` also captures the **onboarding** of the source: `onboarding.json` +
+  10 `prompt-*.json` (prompt keys = slug of separator role: `gender`, `country`…;
+  options = key of its specific role; logical refs against the manifest). Source ID
+  lives in `.env` (`GUILD_ID`); target ID is passed per command (`--guild <id>`).
+  Removed: `adopt-all`, `--manifest`, source reconciliation in the CLI. Config
+  consolidated into a single directory (`config/clone/`; `config/onboarding/` removed).
+  **204 tests green** (fix `required`/`singleSelect` → `false`, deterministic capture by
+  `position` + separator by snowflake, `availableTags` preserves `moderated` always +
+  `emoji_id`, manifest fallback `5m` + robust JSON, REST error mapping, `Makefile`
+  ideal dual with `pnpm`).
+- **Next step:** test `create` against a **disposable server** (bot with
+  `ADMINISTRATOR`) and confirm the 4 `UNVERIFIED` points in `docs/clone-server.md` §UNVERIFIED.
+  `make` is now the ideal interface (`make create-yes TARGET_ID=<id>`), `pnpm` remains as alternative.
 
-Los `POST` de roles/canales no son idempotentes: `create` persiste una intención
-pendiente antes del POST. Si la respuesta se pierde, el siguiente run recupera un único candidato
-exacto o falla cerrado; nunca reintenta a ciegas. Resolver: `pnpm recover-pending roles.<key> --id <snowflake> --guild <target-id>`.
+`POST` for roles/channels are not idempotent: `create` persists a pending
+intent before POST. If the response is lost, the next run recovers a single exact
+candidate or fails closed; never blindly retries. Resolve: `pnpm recover-pending roles.<key> --id <snowflake> --guild <target-id>`.

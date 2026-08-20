@@ -35,18 +35,39 @@ GUILD_ID=paste_your_source_server_id_here
 > never changes). The **target** guild id is declared per run when you build a
 > clone: `pnpm run create --guild <target-id> --yes`.
 
-### 3. Install & validate
+### 3. Install & validate — ideal `make` (Docker), alternative `pnpm` local
+
+**Ideal (Makefile / Docker):**
+
+```bash
+make build
+make validate        # checks the config offline (no network, via Docker)
+```
+
+**Local alternative (without Docker):**
 
 ```bash
 pnpm install
 pnpm validate        # checks the config offline (no network)
 ```
 
-### 4. Run it
+### 4. Run it — ideal `make`, alternative `pnpm`
+
+**Ideal (Makefile):**
+
+```bash
+make create-yes TARGET_ID=<target-id>   # builds/reconciles the target server from config/clone
+# dry-run (plan without applying)
+make create TARGET_ID=<target-id>
+```
+
+**Local alternative (`pnpm`):**
 
 ```bash
 pnpm run create --guild <target-id> --yes   # builds/reconciles the target server from config/clone
 ```
+
+> `make` does not accept free flags → `make create TARGET_ID=<id> --yes` fails; use `make create-yes TARGET_ID=<id>`.
 
 That's it — new members get greeted by the prompts you declared. 🦋✨
 
@@ -60,7 +81,7 @@ That's it — new members get greeted by the prompts you declared. 🦋✨
 🔁 **Idempotent** — re-runs converge to a NOOP, never churn IDs
 🧩 **Fragment merge** — base + one file per prompt, composed at load time
 🐳 **Docker-ready** — multi-stage, non-root, read-only root FS
-🧪 **Tested** — 189 unit + integration tests
+🧪 **Tested** — 204 unit + integration tests
 🧯 **Crash-safe creates** — pending POSTs recover or fail closed, never blind-retry
 
 ---
@@ -114,13 +135,13 @@ Two verbs:
 - **`create`** — build/reconcile a server from those fragments (create-and-bind,
   never deletes; dry-run by default).
 
-| Command                 | What it does                                        |
-| ----------------------- | --------------------------------------------------- |
-| `pnpm validate`         | Validate config offline (Zod + semantic pass)       |
-| `pnpm adopt`            | Bind one logical key by name or snowflake           |
-| `pnpm sync`             | Dump the source guild (`GUILD_ID` from `.env`) into ID-free config fragments + merge bindings into `manifest.json` |
-| `pnpm run create --guild <id> [--dry-run] [--yes]` | Build/reconcile the target from `config/clone` against `manifest.clone.json` (exit 0 converged / 2 applied) |
-| `pnpm recover-pending`  | Resolve an ambiguous target create by explicit snowflake |
+| Makefile (ideal) | pnpm (alternative) | What it does |
+| ---------------- | ------------------ | ------------ |
+| `make validate` | `pnpm validate` | Validate config offline (Zod + semantic pass) |
+| `make sync` | `pnpm sync` | Dump the source guild (`GUILD_ID` from `.env`) into ID-free config fragments + merge bindings into `manifest.json` |
+| `make adopt` | `pnpm adopt` | Bind one logical key by name or snowflake |
+| `make create TARGET_ID=<id>` · `make create-yes TARGET_ID=<id>` | `pnpm run create --guild <id> [--dry-run] [--yes]` | Build/reconcile the target from `config/clone` against `manifest.clone.json` (exit 0 converged / 2 applied; `make` does not accept free `--yes` → use `create-yes`) |
+| `make run CMD="recover-pending ..."` | `pnpm recover-pending` | Resolve an ambiguous target create by explicit snowflake |
 
 > 💡 `create` is **dry-run by default**: it prints the plan and asks for
 > confirmation. `--yes` skips the prompt. It never deletes — it creates what's
@@ -132,12 +153,27 @@ Two verbs:
 > 🧬 The clone flow (`sync` → `create`) is documented in
 > `docs/clone-server.md`.
 
-### 🐳 Docker
+### 🐳 Docker — ideal `make` (wrapper), alternatives
+
+**Ideal (Makefile):**
 
 ```bash
+make validate
+make sync            # exports GUILD_ID from .env
+make create-yes TARGET_ID=<target-id>
+```
+
+**Alternatives:**
+
+```bash
+# direct docker compose
 docker compose run --rm chrysalis validate
-docker compose run --rm chrysalis sync            # exports GUILD_ID from .env
+docker compose run --rm chrysalis sync
 docker compose run --rm chrysalis create --guild <target-id> --yes
+# local pnpm (without Docker)
+pnpm validate
+pnpm sync
+pnpm run create --guild <target-id> --yes
 ```
 
 ---
